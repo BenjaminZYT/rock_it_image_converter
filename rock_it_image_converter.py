@@ -1,10 +1,11 @@
 import dash
-from dash import dcc, html, Input, Output, State
+from dash import dcc, html, Input, Output, State, ctx
 import os
 import io
 import base64
 from PIL import Image
 from pillow_heif import register_heif_opener
+from flask import send_from_directory
 
 # Register HEIF opener
 register_heif_opener()
@@ -39,6 +40,7 @@ app.layout = html.Div([
         },
         multiple=True
     ),
+    html.Div(id='uploaded-files-list', style={'margin': '10px', 'color': 'blue'}),
     html.Label("Select output format:"),
     dcc.Dropdown(
         id='output-format',
@@ -46,6 +48,7 @@ app.layout = html.Div([
         placeholder="Select a file format",
     ),
     html.Button("Convert and Download", id='convert-button', n_clicks=0),
+    html.Button("Reset", id='reset-button', n_clicks=0, style={'margin-left': '10px', 'backgroundColor': 'red', 'color': 'white'}),
     html.Div(id='conversion-status'),
     html.Div(id='download-links', style={'margin-top': '20px'}),
     html.P(
@@ -54,59 +57,69 @@ app.layout = html.Div([
     )
 ])
 
-# Callback for file upload and conversion
+# Callback for file upload, conversion, and resetting
 @app.callback(
-    [Output('conversion-status', 'children'),
-     Output('download-links', 'children')],
-    [Input('convert-button', 'n_clicks')],
-    [State('upload-image', 'contents'),
-     State('upload-image', 'filename'),
-     State('output-format', 'value')]
+    [Output('uploaded-files-list', 'children'),
+     Output('conversion-status', 'children'),
+     Output('download-links', 'children'),
+     Output('output-format', 'value')],
+    [Input('convert-button', 'n_clicks'),
+     Input('reset-button', 'n_clicks'),
+     Input('upload-image', 'contents')],
+    [State('upload-image', 'filename'),
+     State('output-format', 'value')],
+    prevent_initial_call=True
 )
-def convert_and_download(n_clicks, contents, filenames, output_format):
-    if n_clicks == 0 or not contents or not output_format:
-        return "", ""
+def handle_image_operations(convert_clicks, reset_clicks, contents, filenames, output_format):
+    triggered_id = ctx.triggered_id
 
-    conversion_status = []
-    download_links = []
+    if triggered_id == 'reset-button':
+        return "", "", "", None
 
-    for content, filename in zip(contents, filenames):
-        try:
-            # Decode the uploaded file
-            content_type, content_string = content.split(',')
-            decoded = base64.b64decode(content_string)
-            image = Image.open(io.BytesIO(decoded))
+    if triggered_id == 'upload-image' and contents:
+        uploaded_list = html.Ul([html.Li(name) for name in filenames])
+        return uploaded_list, "", "", output_format
 
-            # Prepare output filename and path
-            base_filename = os.path.splitext(filename)[0]
-            output_path = os.path.join(output_dir, f"{base_filename}.{output_format}")
+    if triggered_id == 'convert-button' and contents:
+        if not contents or not output_format:
+            return "", html.Div("Please upload files and select an output format.", style={'color': 'red'}), "", output_format
 
-            # Convert RGBA to RGB if saving as JPEG
-            if output_format.lower() in ["jpg", "jpeg"] and image.mode == "RGBA":
-                image = image.convert("RGB")
+        conversion_status = []
+        download_links = []
 
-            # Save the image in the selected format
-            save_format = "JPEG" if output_format.lower() in ["jpg", "jpeg"] else output_format.upper()
-            image.save(output_path, save_format)
+        for content, filename in zip(contents, filenames):
+            try:
+                content_type, content_string = content.split(',')
+                decoded = base64.b64decode(content_string)
+                image = Image.open(io.BytesIO(decoded))
 
-            # Add to conversion status and download links
-            conversion_status.append(f"Successfully converted {filename} to {output_format.upper()}.")
-            download_link = html.A(
-                f"Download {os.path.basename(output_path)}",
-                href=f"/download/{os.path.basename(output_path)}",
-                target="_blank"
-            )
-            download_links.append(html.Div(download_link))
+                base_filename = os.path.splitext(filename)[0]
+                output_path = os.path.join(output_dir, f"{base_filename}.{output_format}")
 
-        except Exception as e:
-            conversion_status.append(f"Failed to convert {filename}: {str(e)}")
+                if output_format.lower() in ["jpg", "jpeg"] and image.mode == "RGBA":
+                    image = image.convert("RGB")
 
-    return html.Div(conversion_status), html.Div(download_links)
+                save_format = "JPEG" if output_format.lower() in ["jpg", "jpeg"] else output_format.upper()
+                image.save(output_path, save_format)
+
+                conversion_status.append(f"Successfully converted {filename} to {output_format.upper()}.")
+                download_link = html.A(
+                    f"Download {os.path.basename(output_path)}",
+                    href=f"/download/{os.path.basename(output_path)}",
+                    target="_blank"
+                )
+                download_links.append(html.Div(download_link))
+
+            except Exception as e:
+                conversion_status.append(f"Failed to convert {filename}: {str(e)}")
+
+        return "", html.Div(conversion_status), html.Div(download_links), output_format
+
+    return "", "", "", output_format
 
 # Route for downloading files
 @app.server.route('/download/<filename>')
 def download_file(filename):
-    from flask import send_from_directory
     return send_from_directory(output_dir, filename, as_attachment=True)
 
 if __name__ == '__main__':
