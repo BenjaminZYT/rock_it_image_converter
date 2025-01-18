@@ -1,0 +1,6 @@
+dash==2.17.1
+Pillow
+pillow-heif
+ipywidgets
+ipython
+gunicorn
