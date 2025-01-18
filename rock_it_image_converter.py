@@ -47,7 +47,11 @@ app.layout = html.Div([
     ),
     html.Button("Convert and Download", id='convert-button', n_clicks=0),
     html.Div(id='conversion-status'),
-    html.Div(id='download-links', style={'margin-top': '20px'})
+    html.Div(id='download-links', style={'margin-top': '20px'}),
+    html.P(
+        "Created by Benjamin Zu Yao Teoh - Atlanta, GA - January 2025",
+        style={'fontSize': '7px', 'textAlign': 'center', 'marginTop': '20px'}
+    )
 ])
 
 # Callback for file upload and conversion
