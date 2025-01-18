@@ -5,7 +5,7 @@ import io
 import base64
 from PIL import Image
 from pillow_heif import register_heif_opener
-from flask import send_from_directory
+from flask import send_file, Response
 
 # Register HEIF opener
 register_heif_opener()
@@ -50,7 +50,6 @@ app.layout = html.Div([
     html.Button("Convert and Download", id='convert-button', n_clicks=0),
     html.Button("Reset", id='reset-button', n_clicks=0, style={'margin-left': '10px', 'backgroundColor': 'red', 'color': 'white'}),
     html.Div(id='conversion-status'),
-    html.Div(id='download-links', style={'margin-top': '20px'}),
     html.P(
         "Created by Benjamin Zu Yao Teoh - Atlanta, GA - January 2025",
         style={'fontSize': '7px', 'textAlign': 'center', 'marginTop': '20px'}
@@ -60,9 +59,7 @@ app.layout = html.Div([
 # Callback for file upload, conversion, and resetting
 @app.callback(
     [Output('uploaded-files-list', 'children'),
-     Output('conversion-status', 'children'),
-     Output('download-links', 'children'),
-     Output('output-format', 'value')],
+     Output('conversion-status', 'children')],
     [Input('convert-button', 'n_clicks'),
      Input('reset-button', 'n_clicks'),
      Input('upload-image', 'contents')],
@@ -74,18 +71,17 @@ def handle_image_operations(convert_clicks, reset_clicks, contents, filenames, o
     triggered_id = ctx.triggered_id
 
     if triggered_id == 'reset-button':
-        return "", "", "", None
+        return "", ""
 
     if triggered_id == 'upload-image' and contents:
         uploaded_list = html.Ul([html.Li(name) for name in filenames])
-        return uploaded_list, "", "", output_format
+        return uploaded_list, ""
 
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
-            return "", html.Div("Please upload files and select an output format.", style={'color': 'red'}), "", output_format
+            return "", html.Div("Please upload files and select an output format.", style={'color': 'red'})
 
         conversion_status = []
-        download_links = []
 
         for content, filename in zip(contents, filenames):
             try:
@@ -103,24 +99,19 @@ def handle_image_operations(convert_clicks, reset_clicks, contents, filenames, o
                 image.save(output_path, save_format)
 
                 conversion_status.append(f"Successfully converted {filename} to {output_format.upper()}.")
-                download_link = html.A(
-                    f"Download {os.path.basename(output_path)}",
-                    href=f"/download/{os.path.basename(output_path)}",
-                    target="_blank"
+                # Serve the file for download immediately
+                return "", Response(
+                    send_file(output_path, as_attachment=True),
+                    mimetype="application/octet-stream",
+                    headers={"Content-Disposition": f"attachment;filename={os.path.basename(output_path)}"}
                 )
-                download_links.append(html.Div(download_link))
 
             except Exception as e:
                 conversion_status.append(f"Failed to convert {filename}: {str(e)}")
 
-        return "", html.Div(conversion_status), html.Div(download_links), output_format
+        return "", html.Div(conversion_status)
 
-    return "", "", "", output_format
-
-# Route for downloading files
-@app.server.route('/download/<filename>')
-def download_file(filename):
-    return send_from_directory(output_dir, filename, as_attachment=True)
+    return "", ""
 
 if __name__ == '__main__':
     app.run_server(debug=False)
