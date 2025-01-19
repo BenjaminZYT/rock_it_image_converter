@@ -40,7 +40,11 @@ app.layout = html.Div([
         },
         multiple=False  # Allow one file at a time for conversion
     ),
-    html.Div(id='uploaded-files-list', style={'margin': '10px', 'color': 'blue'}),
+    dcc.Loading(
+        id='upload-progress',
+        type='default',
+        children=html.Div(id='uploaded-files-list', style={'margin': '10px', 'color': 'blue'})
+    ),
     html.Label("Select output format:"),
     dcc.Dropdown(
         id='output-format',
@@ -49,7 +53,11 @@ app.layout = html.Div([
     ),
     html.Button("Convert and Download", id='convert-button', n_clicks=0),
     html.Button("Reset", id='reset-button', n_clicks=0, style={'margin-left': '10px', 'backgroundColor': 'red', 'color': 'white'}),
-    html.Div(id='conversion-status'),
+    dcc.Loading(
+        id='download-progress',
+        type='default',
+        children=html.Div(id='conversion-status')
+    ),
     html.P(
         "Created by Benjamin Zu Yao Teoh - Atlanta, GA - January 2025",
         style={'fontSize': '7px', 'textAlign': 'center', 'marginTop': '20px'}
@@ -59,7 +67,9 @@ app.layout = html.Div([
 # Callback for file upload, conversion, and resetting
 @app.callback(
     [Output('uploaded-files-list', 'children'),
-     Output('conversion-status', 'children')],
+     Output('conversion-status', 'children'),
+     Output('upload-progress', 'style'),
+     Output('download-progress', 'style')],
     [Input('upload-image', 'contents'),
      Input('convert-button', 'n_clicks'),
      Input('reset-button', 'n_clicks')],
@@ -71,15 +81,15 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
     triggered_id = ctx.triggered_id
 
     if triggered_id == 'reset-button':
-        return "", ""
+        return "", "", {'display': 'none'}, {'display': 'none'}
 
     if triggered_id == 'upload-image' and contents:
         uploaded_message = html.Div(f"File uploaded: {filename}", style={'color': 'green'})
-        return uploaded_message, ""
+        return uploaded_message, "", {'display': 'block'}, {'display': 'none'}
 
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
-            return "", html.Div("Please upload a file and select an output format.", style={'color': 'red'})
+            return "", html.Div("Please upload a file and select an output format.", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}
 
         try:
             content_type, content_string = contents.split(',')
@@ -95,12 +105,12 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
             save_format = "JPEG" if output_format.lower() in ["jpg", "jpeg"] else output_format.upper()
             image.save(output_path, save_format)
 
-            return "", dcc.Location(href=f"/download/{os.path.basename(output_path)}", id="redirect")
+            return "", html.Div(f"Download ready: {os.path.basename(output_path)}", style={'color': 'green'}), {'display': 'none'}, {'display': 'block'}
 
         except Exception as e:
-            return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'})
+            return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}
 
-    return "", ""
+    return "", "", {'display': 'none'}, {'display': 'none'}
 
 # Route for downloading files
 @app.server.route('/download/<filename>')
