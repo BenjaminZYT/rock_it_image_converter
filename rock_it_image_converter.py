@@ -6,6 +6,7 @@ import base64
 from PIL import Image
 from pillow_heif import register_heif_opener
 from flask import send_from_directory
+import time
 
 # Register HEIF opener
 register_heif_opener()
@@ -105,7 +106,9 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
             save_format = "JPEG" if output_format.lower() in ["jpg", "jpeg"] else output_format.upper()
             image.save(output_path, save_format)
 
-            return "", html.Div(f"Download ready: {os.path.basename(output_path)}", style={'color': 'green'}), {'display': 'none'}, {'display': 'block'}
+            time.sleep(2)  # Simulating download progress
+
+            return "", dcc.send_file(output_path), {'display': 'none'}, {'display': 'block'}
 
         except Exception as e:
             return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}
