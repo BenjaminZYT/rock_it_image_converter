@@ -108,7 +108,14 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
 
             time.sleep(2)  # Simulating download progress
 
-            return "", dcc.send_file(output_path), {'display': 'none'}, {'display': 'block'}
+            download_link = html.A(
+                "Click here to download",
+                href=f"/download/{os.path.basename(output_path)}",
+                target="_blank",
+                style={'color': 'blue', 'textDecoration': 'underline'}
+            )
+
+            return "", html.Div(download_link), {'display': 'none'}, {'display': 'block'}
 
         except Exception as e:
             return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}
