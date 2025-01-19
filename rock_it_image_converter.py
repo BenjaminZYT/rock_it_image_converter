@@ -5,7 +5,7 @@ import io
 import base64
 from PIL import Image
 from pillow_heif import register_heif_opener
-from flask import send_file, Response
+from flask import send_from_directory
 
 # Register HEIF opener
 register_heif_opener()
@@ -38,7 +38,7 @@ app.layout = html.Div([
             'textAlign': 'center',
             'margin': '10px'
         },
-        multiple=True
+        multiple=False  # Allow one file at a time for conversion
     ),
     html.Div(id='uploaded-files-list', style={'margin': '10px', 'color': 'blue'}),
     html.Label("Select output format:"),
@@ -61,57 +61,47 @@ app.layout = html.Div([
     [Output('uploaded-files-list', 'children'),
      Output('conversion-status', 'children')],
     [Input('convert-button', 'n_clicks'),
-     Input('reset-button', 'n_clicks'),
-     Input('upload-image', 'contents')],
-    [State('upload-image', 'filename'),
+     Input('reset-button', 'n_clicks')],
+    [State('upload-image', 'contents'),
+     State('upload-image', 'filename'),
      State('output-format', 'value')],
     prevent_initial_call=True
 )
-def handle_image_operations(convert_clicks, reset_clicks, contents, filenames, output_format):
+def handle_image_operations(convert_clicks, reset_clicks, contents, filename, output_format):
     triggered_id = ctx.triggered_id
 
     if triggered_id == 'reset-button':
         return "", ""
 
-    if triggered_id == 'upload-image' and contents:
-        uploaded_list = html.Ul([html.Li(name) for name in filenames])
-        return uploaded_list, ""
-
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
-            return "", html.Div("Please upload files and select an output format.", style={'color': 'red'})
+            return "", html.Div("Please upload a file and select an output format.", style={'color': 'red'})
 
-        conversion_status = []
+        try:
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
+            image = Image.open(io.BytesIO(decoded))
 
-        for content, filename in zip(contents, filenames):
-            try:
-                content_type, content_string = content.split(',')
-                decoded = base64.b64decode(content_string)
-                image = Image.open(io.BytesIO(decoded))
+            base_filename = os.path.splitext(filename)[0]
+            output_path = os.path.join(output_dir, f"{base_filename}.{output_format}")
 
-                base_filename = os.path.splitext(filename)[0]
-                output_path = os.path.join(output_dir, f"{base_filename}.{output_format}")
+            if output_format.lower() in ["jpg", "jpeg"] and image.mode == "RGBA":
+                image = image.convert("RGB")
 
-                if output_format.lower() in ["jpg", "jpeg"] and image.mode == "RGBA":
-                    image = image.convert("RGB")
+            save_format = "JPEG" if output_format.lower() in ["jpg", "jpeg"] else output_format.upper()
+            image.save(output_path, save_format)
 
-                save_format = "JPEG" if output_format.lower() in ["jpg", "jpeg"] else output_format.upper()
-                image.save(output_path, save_format)
+            return "", dcc.Location(href=f"/download/{os.path.basename(output_path)}", id="redirect")
 
-                conversion_status.append(f"Successfully converted {filename} to {output_format.upper()}.")
-                # Serve the file for download immediately
-                return "", Response(
-                    send_file(output_path, as_attachment=True),
-                    mimetype="application/octet-stream",
-                    headers={"Content-Disposition": f"attachment;filename={os.path.basename(output_path)}"}
-                )
-
-            except Exception as e:
-                conversion_status.append(f"Failed to convert {filename}: {str(e)}")
-
-        return "", html.Div(conversion_status)
+        except Exception as e:
+            return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'})
 
     return "", ""
+
+# Route for downloading files
+@app.server.route('/download/<filename>')
+def download_file(filename):
+    return send_from_directory(output_dir, filename, as_attachment=True)
 
 if __name__ == '__main__':
     app.run_server(debug=False)
