@@ -5,7 +5,7 @@ import io
 import base64
 from PIL import Image
 from pillow_heif import register_heif_opener
-from flask import send_from_directory
+from flask import send_from_directory, redirect, url_for
 import time
 
 # Register HEIF opener
@@ -109,12 +109,15 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
 
             time.sleep(2)  # Simulating download progress
 
+            # Redirect to trigger automatic download
+            download_url = f"/download/{os.path.basename(output_path)}"
             return (
                 "", 
                 html.Div(f"Conversion successful! Download should begin automatically.", style={'color': 'green'}), 
                 {'display': 'none'}, 
                 {'display': 'block'},
-                dash.no_update
+                0,  # Reset button click state
+                redirect(download_url)
             )
 
         except Exception as e:
