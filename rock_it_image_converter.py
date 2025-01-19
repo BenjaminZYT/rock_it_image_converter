@@ -60,18 +60,22 @@ app.layout = html.Div([
 @app.callback(
     [Output('uploaded-files-list', 'children'),
      Output('conversion-status', 'children')],
-    [Input('convert-button', 'n_clicks'),
+    [Input('upload-image', 'contents'),
+     Input('convert-button', 'n_clicks'),
      Input('reset-button', 'n_clicks')],
-    [State('upload-image', 'contents'),
-     State('upload-image', 'filename'),
+    [State('upload-image', 'filename'),
      State('output-format', 'value')],
     prevent_initial_call=True
 )
-def handle_image_operations(convert_clicks, reset_clicks, contents, filename, output_format):
+def handle_image_operations(contents, convert_clicks, reset_clicks, filename, output_format):
     triggered_id = ctx.triggered_id
 
     if triggered_id == 'reset-button':
         return "", ""
+
+    if triggered_id == 'upload-image' and contents:
+        uploaded_message = html.Div(f"File uploaded: {filename}", style={'color': 'green'})
+        return uploaded_message, ""
 
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
