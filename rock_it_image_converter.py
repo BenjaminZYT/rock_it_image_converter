@@ -5,7 +5,7 @@ import io
 import base64
 from PIL import Image
 from pillow_heif import register_heif_opener
-from flask import send_from_directory, redirect, url_for
+from flask import send_file, Flask
 import time
 
 # Register HEIF opener
@@ -70,8 +70,7 @@ app.layout = html.Div([
     [Output('uploaded-files-list', 'children'),
      Output('conversion-status', 'children'),
      Output('upload-progress', 'style'),
-     Output('download-progress', 'style'),
-     Output('convert-button', 'n_clicks')],
+     Output('download-progress', 'style')],
     [Input('upload-image', 'contents'),
      Input('convert-button', 'n_clicks'),
      Input('reset-button', 'n_clicks')],
@@ -83,15 +82,15 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
     triggered_id = ctx.triggered_id
 
     if triggered_id == 'reset-button':
-        return "", "", {'display': 'none'}, {'display': 'none'}, 0
+        return "", "", {'display': 'none'}, {'display': 'none'}
 
     if triggered_id == 'upload-image' and contents:
         uploaded_message = html.Div(f"File uploaded: {filename}", style={'color': 'green'})
-        return uploaded_message, "", {'display': 'block'}, {'display': 'none'}, dash.no_update
+        return uploaded_message, "", {'display': 'block'}, {'display': 'none'}
 
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
-            return "", html.Div("Please upload a file and select an output format.", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}, dash.no_update
+            return "", html.Div("Please upload a file and select an output format.", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}
 
         try:
             content_type, content_string = contents.split(',')
@@ -109,26 +108,24 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
 
             time.sleep(2)  # Simulating download progress
 
-            # Redirect to trigger automatic download
-            download_url = f"/download/{os.path.basename(output_path)}"
+            # Trigger automatic download
             return (
                 "", 
-                html.Div(f"Conversion successful! Download should begin automatically.", style={'color': 'green'}), 
-                {'display': 'none'}, 
-                {'display': 'block'},
-                0,  # Reset button click state
-                redirect(download_url)
+                dcc.Location(href=f"/download/{os.path.basename(output_path)}"),
+                {'display': 'none'},
+                {'display': 'block'}
             )
 
         except Exception as e:
-            return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}, dash.no_update
+            return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}
 
-    return "", "", {'display': 'none'}, {'display': 'none'}, dash.no_update
+    return "", "", {'display': 'none'}, {'display': 'none'}
 
 # Route for downloading files
 @app.server.route('/download/<filename>')
 def download_file(filename):
-    return send_from_directory(output_dir, filename, as_attachment=True)
+    file_path = os.path.join(output_dir, filename)
+    return send_file(file_path, as_attachment=True)
 
 if __name__ == '__main__':
     app.run_server(debug=False)
