@@ -70,7 +70,8 @@ app.layout = html.Div([
     [Output('uploaded-files-list', 'children'),
      Output('conversion-status', 'children'),
      Output('upload-progress', 'style'),
-     Output('download-progress', 'style')],
+     Output('download-progress', 'style'),
+     Output('convert-button', 'n_clicks')],
     [Input('upload-image', 'contents'),
      Input('convert-button', 'n_clicks'),
      Input('reset-button', 'n_clicks')],
@@ -82,15 +83,15 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
     triggered_id = ctx.triggered_id
 
     if triggered_id == 'reset-button':
-        return "", "", {'display': 'none'}, {'display': 'none'}
+        return "", "", {'display': 'none'}, {'display': 'none'}, 0
 
     if triggered_id == 'upload-image' and contents:
         uploaded_message = html.Div(f"File uploaded: {filename}", style={'color': 'green'})
-        return uploaded_message, "", {'display': 'block'}, {'display': 'none'}
+        return uploaded_message, "", {'display': 'block'}, {'display': 'none'}, dash.no_update
 
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
-            return "", html.Div("Please upload a file and select an output format.", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}
+            return "", html.Div("Please upload a file and select an output format.", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}, dash.no_update
 
         try:
             content_type, content_string = contents.split(',')
@@ -108,19 +109,18 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
 
             time.sleep(2)  # Simulating download progress
 
-            download_link = html.A(
-                "Click here to download",
-                href=f"/download/{os.path.basename(output_path)}",
-                target="_blank",
-                style={'color': 'blue', 'textDecoration': 'underline'}
+            return (
+                "", 
+                html.Div(f"Conversion successful! Download should begin automatically.", style={'color': 'green'}), 
+                {'display': 'none'}, 
+                {'display': 'block'},
+                dash.no_update
             )
 
-            return "", html.Div(download_link), {'display': 'none'}, {'display': 'block'}
-
         except Exception as e:
-            return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}
+            return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}, dash.no_update
 
-    return "", "", {'display': 'none'}, {'display': 'none'}
+    return "", "", {'display': 'none'}, {'display': 'none'}, dash.no_update
 
 # Route for downloading files
 @app.server.route('/download/<filename>')
