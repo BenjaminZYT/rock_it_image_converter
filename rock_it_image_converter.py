@@ -75,13 +75,14 @@ app.layout = html.Div([
 def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filename, output_format):
     triggered_id = ctx.triggered_id
 
-    # Only proceed if triggered by upload or conversion button
-    if triggered_id not in ['upload-image', 'convert-button']:
-        return "", "", None, None
-
+    # Check if the trigger is the "Reset" button first
     if triggered_id == 'reset-button':
         # Clear all outputs on reset
         return "", "", None, None
+
+    # Only proceed if triggered by upload or conversion button
+    if triggered_id not in ['upload-image', 'convert-button']:
+        return "", "", None, None 
 
     if triggered_id == 'upload-image' and contents:
         audio_src = "https://www.voicy.network/Content/Clips/Sounds/2022/10/9e13b434-b0f4-4cf7-85b1-0a8eb75e06f9.mp3"  # Clip from "I Feel Good"
