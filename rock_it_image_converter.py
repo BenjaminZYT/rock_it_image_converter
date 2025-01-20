@@ -3,7 +3,7 @@ from dash import dcc, html, Input, Output, State
 import dash_uploader as du
 import os
 from PIL import Image
-import uuid
+import shutil
 
 # Initialize Dash app
 app = dash.Dash(__name__)
@@ -44,10 +44,14 @@ app.layout = html.Div([
 @app.callback(
     Output('upload-status', 'children'),
     Input('uploader', 'isCompleted'),
-    State('uploader', 'fileNames')
+    State('uploader', 'fileNames'),
+    State('uploader', 'filePaths')
 )
-def file_uploaded(is_completed, filenames):
-    if is_completed and filenames:
+def file_uploaded(is_completed, filenames, filepaths):
+    if is_completed and filenames and filepaths:
+        # Save the uploaded file manually to the UPLOAD_FOLDER
+        for filepath, filename in zip(filepaths, filenames):
+            shutil.move(filepath, os.path.join(UPLOAD_FOLDER, filename))
         return f"File '{filenames[0]}' has been uploaded."
     return ""
 
@@ -86,6 +90,18 @@ def convert_and_download(n_convert, n_reset, filenames, output_format):
                      style={"color": "green"})
     except Exception as e:
         return f"An error occurred during conversion: {e}"
+
+@app.callback(
+    [Output('upload-status', 'children'),
+     Output('conversion-status', 'children'),
+     Output('format-dropdown', 'value'),
+     Output('uploader', 'isCompleted')],
+    Input('reset-button', 'n_clicks')
+)
+def reset_app(n_reset):
+    if n_reset > 0:
+        return "", "", None, False
+    return dash.no_update
 
 # Serve converted files
 @app.server.route('/converted/<filename>')
