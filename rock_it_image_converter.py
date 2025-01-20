@@ -59,67 +59,60 @@ app.layout = html.Div([
     )
 ])
 
-# Callback for handling upload, conversion, download, and reset
 @app.callback(
     [Output('uploaded-files-list', 'children'),
      Output('conversion-status', 'children'),
      Output('redirect', 'href'),
      Output('audio-player', 'src'),
-     Output('output-format', 'value')],  # Include output-format in the outputs
-    [Input('convert-button', 'n_clicks'),
-     Input('reset-button', 'n_clicks'),
-     Input('upload-image', 'contents')],
+     Output('output-format', 'value')],
+    [Input('convert-button', 'n_clicks')],
     [State('upload-image', 'filename'),
-     State('output-format', 'value')],  # Keep output_format in State
+     State('output-format', 'value')],
     prevent_initial_call=True
 )
-def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filename, output_format):
-    triggered_id = ctx.triggered_id
+def handle_conversion_and_download(convert_clicks, filename, output_format):
+    if not convert_clicks:
+        return "", "", None, None, None  # Prevent initial call
 
-    # Check if the trigger is the "Reset" button first
-    if triggered_id == 'reset-button':
-        # Clear all outputs on reset
-        return "", "", None, None, None  # Clear the selected output format
+    if not contents or not output_format:
+        return "", "Please upload a file and select an output format.", None, None, output_format
 
-    # Only proceed if triggered by upload or conversion button
-    if triggered_id not in ['upload-image', 'convert-button']:
-        return "", "", None, None, None
+    try:
+        # Decode the uploaded file
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        image = Image.open(io.BytesIO(decoded))
 
-    audio_src = None  # Initialize audio_src outside the if-else block
+        # Prepare output file path
+        base_filename = os.path.splitext(filename)[0]
+        output_path = os.path.join(output_dir, f"{base_filename}.{output_format}")
 
-    if triggered_id == 'upload-image' and contents:
-        audio_src = "https://www.voicy.network/Content/Clips/Sounds/2022/10/9e13b434-b0f4-4cf7-85b1-0a8eb75e06f9.mp3"  # Clip from "I Feel Good"
-        return f"Uploaded file: {filename}", "", None, audio_src, None  # Don't set output_format on upload
+        # Convert RGBA to RGB if saving as JPEG
+        if output_format.lower() in ['jpg', 'jpeg'] and image.mode == 'RGBA':
+            image = image.convert('RGB')
 
-    if triggered_id == 'convert-button' and contents:
-        if not contents or not output_format:  # Access output_format here
-            return "", "Please upload a file and select an output format.", None, None, output_format  # Return the selected format
+        save_format = 'JPEG' if output_format.lower() in ['jpg', 'jpeg'] else output_format.upper()
+        image.save(output_path, save_format)
 
-        try:
-            # Decode the uploaded file
-            content_type, content_string = contents.split(',')
-            decoded = base64.b64decode(content_string)
-            image = Image.open(io.BytesIO(decoded))
+        # Generate the download link
+        download_href = f"/download/{os.path.basename(output_path)}"
+        return f"File uploaded: {filename}", "Converted file downloaded!", download_href, audio_src, output_format 
 
-            # Prepare output file path
-            base_filename = os.path.splitext(filename)[0]
-            output_path = os.path.join(output_dir, f"{base_filename}.{output_format}")
+    except Exception as e:
+        return "", f"Failed to convert {filename}: {str(e)}", None, None, output_format 
 
-            # Convert RGBA to RGB if saving as JPEG
-            if output_format.lower() in ['jpg', 'jpeg'] and image.mode == 'RGBA':
-                image = image.convert('RGB')
-
-            save_format = 'JPEG' if output_format.lower() in ['jpg', 'jpeg'] else output_format.upper()
-            image.save(output_path, save_format)
-
-            # Generate the download link
-            download_href = f"/download/{os.path.basename(output_path)}"
-            return f"File uploaded: {filename}", "Converted file downloaded!", download_href, audio_src, output_format 
-
-        except Exception as e:
-            return "", f"Failed to convert {filename}: {str(e)}", None, None, output_format 
-
-    return "", "", None, None, None  # Return None for output_format in all other cases
+@app.callback(
+    [Output('uploaded-files-list', 'children'),
+     Output('conversion-status', 'children'),
+     Output('redirect', 'href'),
+     Output('audio-player', 'src'),
+     Output('output-format', 'value')],
+    [Input('reset-button', 'n_clicks')],
+    prevent_initial_call=True
+)
+def handle_reset(reset_clicks):
+    if reset_clicks:  # Only execute if the "Reset" button was clicked
+        return "", "", None, None, None 
 
 # Route for downloading files
 @app.server.route('/download/<filename>')
