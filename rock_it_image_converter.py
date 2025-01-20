@@ -84,6 +84,8 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
     if triggered_id not in ['upload-image', 'convert-button']:
         return "", "", None, None 
 
+    audio_src = None  # Initialize audio_src outside the if-else block
+
     if triggered_id == 'upload-image' and contents:
         audio_src = "https://www.voicy.network/Content/Clips/Sounds/2022/10/9e13b434-b0f4-4cf7-85b1-0a8eb75e06f9.mp3"  # Clip from "I Feel Good"
         return f"Uploaded file: {filename}", "", None, audio_src
@@ -111,7 +113,7 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
 
             # Generate the download link
             download_href = f"/download/{os.path.basename(output_path)}"
-            return f"File uploaded: {filename}", "Converted file downloaded!", download_href, None
+            return f"File uploaded: {filename}", "Converted file downloaded!", download_href, audio_src 
 
         except Exception as e:
             return "", f"Failed to convert {filename}: {str(e)}", None, None
