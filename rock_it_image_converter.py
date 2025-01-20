@@ -64,9 +64,9 @@ app.layout = html.Div([
      Output('conversion-status', 'children'),
      Output('redirect', 'href')],
     [Input('convert-button', 'n_clicks'),
-     Input('reset-button', 'n_clicks')],
-    [State('upload-image', 'contents'),
-     State('upload-image', 'filename'),
+     Input('reset-button', 'n_clicks'),
+     Input('upload-image', 'contents')],
+    [State('upload-image', 'filename'),
      State('output-format', 'value')],
     prevent_initial_call=True
 )
@@ -75,6 +75,9 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
 
     if triggered_id == 'reset-button':
         return "", "", None
+
+    if triggered_id == 'upload-image' and contents:
+        return f"Uploaded file: {filename}", "", None
 
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
