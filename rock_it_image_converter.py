@@ -1,132 +1,96 @@
 import dash
-from dash import dcc, html, Input, Output, State, ctx
+from dash import dcc, html, Input, Output, State
+import dash_uploader as du
 import os
-import io
-import base64
 from PIL import Image
-from pillow_heif import register_heif_opener
-from flask import send_file
-import time
+import uuid
 
-# Register HEIF opener
-register_heif_opener()
-
-# Initialize the Dash app
+# Initialize Dash app
 app = dash.Dash(__name__)
 server = app.server
+UPLOAD_FOLDER = "./uploads"
+CONVERTED_FOLDER = "./converted"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(CONVERTED_FOLDER, exist_ok=True)
 
-# Create a directory for storing converted images
-output_dir = "converted_images"
-os.makedirs(output_dir, exist_ok=True)
+# Configure Dash Uploader
+du.configure_upload(app, UPLOAD_FOLDER)
 
-# Supported extensions
-extensions = ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif']
-
-# Layout of the Dash app
 app.layout = html.Div([
-    html.H1("Image Converter"),
-    html.Label("Upload an image to convert:"),
-    dcc.Upload(
-        id='upload-image',
-        children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
-        style={
-            'width': '100%',
-            'height': '60px',
-            'lineHeight': '60px',
-            'borderWidth': '1px',
-            'borderStyle': 'dashed',
-            'borderRadius': '5px',
-            'textAlign': 'center',
-            'margin': '10px'
-        },
-        multiple=False  # Allow one file at a time for conversion
-    ),
-    dcc.Loading(
-        id='upload-progress',
-        type='default',
-        children=html.Div(id='uploaded-files-list', style={'margin': '10px', 'color': 'blue'})
-    ),
-    html.Label("Select output format:"),
+    html.H1("Image File Converter"),
+    du.Upload(id='uploader',
+              text="Drag and Drop or Click to Upload",
+              text_completed="File Uploaded!",
+              filetypes=['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif', 'heic'],
+              max_file_size=1800),  # Max size in MB
+    html.Div(id='upload-status', style={"marginTop": "20px", "color": "green"}),
+
+    html.Label("Select Output Format:"),
     dcc.Dropdown(
-        id='output-format',
-        options=[{'label': ext.upper(), 'value': ext} for ext in extensions],
-        placeholder="Select a file format",
+        id='format-dropdown',
+        options=[
+            {"label": ext.upper(), "value": ext} for ext in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif']
+        ],
+        placeholder="Select a format",
+        style={"width": "50%"}
     ),
+
     html.Button("Convert and Download", id='convert-button', n_clicks=0),
-    html.Button("Reset", id='reset-button', n_clicks=0, style={'margin-left': '10px', 'backgroundColor': 'red', 'color': 'white'}),
-    dcc.Loading(
-        id='download-progress',
-        type='default',
-        children=html.Div(id='conversion-status')
-    ),
-    html.P(
-        "Created by Benjamin Zu Yao Teoh - Atlanta, GA - January 2025",
-        style={'fontSize': '7px', 'textAlign': 'center', 'marginTop': '20px'}
-    )
+    html.Div(id='conversion-status', style={"marginTop": "20px", "color": "blue"}),
+
+    html.Button("Reset", id='reset-button', n_clicks=0, style={"marginTop": "20px"})
 ])
 
-# Callback for file upload, conversion, and resetting
 @app.callback(
-    [Output('uploaded-files-list', 'children'),
-     Output('conversion-status', 'children'),
-     Output('upload-progress', 'style'),
-     Output('download-progress', 'style'),
-     Output('conversion-status', 'style')],
-    [Input('upload-image', 'contents'),
-     Input('convert-button', 'n_clicks'),
-     Input('reset-button', 'n_clicks')],
-    [State('upload-image', 'filename'),
-     State('output-format', 'value')],
-    prevent_initial_call=True
+    Output('upload-status', 'children'),
+    Input('uploader', 'isCompleted'),
+    State('uploader', 'fileNames')
 )
-def handle_image_operations(contents, convert_clicks, reset_clicks, filename, output_format):
-    triggered_id = ctx.triggered_id
+def file_uploaded(is_completed, filenames):
+    if is_completed and filenames:
+        return f"File '{filenames[0]}' has been uploaded."
+    return ""
 
-    if triggered_id == 'reset-button':
-        return "", "", {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
+@app.callback(
+    Output('conversion-status', 'children'),
+    [Input('convert-button', 'n_clicks'),
+     Input('reset-button', 'n_clicks')],
+    [State('uploader', 'fileNames'),
+     State('format-dropdown', 'value')]
+)
+def convert_and_download(n_convert, n_reset, filenames, output_format):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return ""
 
-    if triggered_id == 'upload-image' and contents:
-        uploaded_message = html.Div(f"File uploaded: {filename}", style={'color': 'green'})
-        return uploaded_message, "", {'display': 'block'}, {'display': 'none'}, {'display': 'none'}
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    if triggered_id == 'convert-button' and contents:
-        if not contents or not output_format:
-            return "", html.Div("Please upload a file and select an output format.", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
+    if trigger_id == 'reset-button':
+        return ""
 
-        try:
-            content_type, content_string = contents.split(',')
-            decoded = base64.b64decode(content_string)
-            image = Image.open(io.BytesIO(decoded))
+    if not filenames or not output_format:
+        return "Please upload a file and select an output format."
 
-            base_filename = os.path.splitext(filename)[0]
-            output_path = os.path.join(output_dir, f"{base_filename}.{output_format}")
+    input_file = os.path.join(UPLOAD_FOLDER, filenames[0])
+    base_filename = os.path.splitext(filenames[0])[0]
+    output_file = os.path.join(CONVERTED_FOLDER, f"{base_filename}.{output_format}")
 
-            if output_format.lower() in ["jpg", "jpeg"] and image.mode == "RGBA":
-                image = image.convert("RGB")
+    try:
+        with Image.open(input_file) as img:
+            img.convert("RGB").save(output_file, format=output_format.upper())
+        
+        # Provide a download link
+        return html.A("Converted image file downloaded! Click here to download.",
+                     href=f"/converted/{base_filename}.{output_format}",
+                     download=f"{base_filename}.{output_format}",
+                     style={"color": "green"})
+    except Exception as e:
+        return f"An error occurred during conversion: {e}"
 
-            save_format = "JPEG" if output_format.lower() in ["jpg", "jpeg"] else output_format.upper()
-            image.save(output_path, save_format)
+# Serve converted files
+@app.server.route('/converted/<filename>')
+def serve_converted_file(filename):
+    return dash.server.send_from_directory(CONVERTED_FOLDER, filename)
 
-            time.sleep(2)  # Simulating download progress
-
-            return (
-                "", 
-                html.Div("Converted image file downloaded!", style={'color': 'green'}),
-                {'display': 'none'},
-                {'display': 'block'},
-                {'display': 'block'}
-            )
-
-        except Exception as e:
-            return "", html.Div(f"Failed to convert {filename}: {str(e)}", style={'color': 'red'}), {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
-
-    return "", "", {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
-
-# Route for downloading files
-@app.server.route('/download/<filename>')
-def download_file(filename):
-    file_path = os.path.join(output_dir, filename)
-    return send_file(file_path, as_attachment=True)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(debug=False)
