@@ -76,6 +76,7 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
     triggered_id = ctx.triggered_id
 
     if triggered_id == 'reset-button':
+        # Clear all outputs on reset
         return "", "", None, None
 
     if triggered_id == 'upload-image' and contents:
