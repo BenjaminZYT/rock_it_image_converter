@@ -1,120 +1,140 @@
 import dash
-from dash import dcc, html, Input, Output, State, ctx
+from dash import dcc, html, Input, Output, State, callback_context
 import os
 import io
 import base64
 from PIL import Image
 from pillow_heif import register_heif_opener
-from flask import Flask, send_file
-import time
+import dash_bootstrap_components as dbc
 
-# Register HEIF opener
+# Register HEIC support
 register_heif_opener()
 
-# Initialize the Dash app
-app = dash.Dash(__name__)
-server = app.server
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-# Create a directory for storing converted images
-output_dir = "converted_images"
-os.makedirs(output_dir, exist_ok=True)
+# Define initial state variables
+state = {
+    'uploaded_filename': '',
+    'upload_message': '',
+    'conversion_message': '',
+    'converted_image': None
+}
 
-# Supported extensions
-extensions = ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif']
-
-# Layout of the Dash app
-app.layout = html.Div([
+app.layout = dbc.Container([
     html.H1("Image Converter"),
-    html.Label("Upload an image to convert:"),
-    dcc.Upload(
-        id='upload-image',
-        children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
-        style={
-            'width': '100%',
-            'height': '60px',
-            'lineHeight': '60px',
-            'borderWidth': '1px',
-            'borderStyle': 'dashed',
-            'borderRadius': '5px',
-            'textAlign': 'center',
-            'margin': '10px'
-        },
-        multiple=False  # Allow one file at a time for conversion
-    ),
-    html.Audio(id='audio-player', src='', controls=False, autoPlay=True, style={'display': 'none'}),
-    html.Div(id='uploaded-files-list', style={'margin': '10px', 'color': 'blue'}),
-    html.Label("Select output format:"),
-    dcc.Dropdown(
-        id='output-format',
-        options=[{'label': ext.upper(), 'value': ext} for ext in extensions],
-        placeholder="Select a file format",
-    ),
-    html.Button("Convert and Download", id='convert-button', n_clicks=0),
-    html.Button("Reset", id='reset-button', n_clicks=0, style={'margin-left': '10px', 'backgroundColor': 'red', 'color': 'white'}),
-    html.Div(id='conversion-status', style={'margin-top': '20px', 'color': 'green'}),
-    dcc.Location(id='redirect', refresh=True),
-    html.P(
-        "Created by Benjamin Zu Yao Teoh - Atlanta, GA - January 2025",
-        style={'fontSize': '7px', 'textAlign': 'center', 'marginTop': '20px'}
-    )
+    dbc.Row([
+        dbc.Col([
+            dbc.FileUpload(
+                id='upload-image',
+                multiple=False,
+                children='Drag and Drop or Browse File'
+            ),
+            html.Div(id='upload-message'),
+        ], width=6),
+        dbc.Col([
+            dcc.Dropdown(
+                id='output-format',
+                options=[
+                    {'label': 'JPEG', 'value': 'jpeg'},
+                    {'label': 'PNG', 'value': 'png'},
+                    {'label': 'BMP', 'value': 'bmp'},
+                    {'label': 'TIFF', 'value': 'tiff'},
+                    {'label': 'GIF', 'value': 'gif'}
+                ],
+                placeholder="Select Output Format"
+            ),
+            dbc.Button("Convert and Download", id="convert-button"),
+            html.Div(id='conversion-message'),
+        ], width=6)
+    ]),
+    html.Div(id='converted-image-container'),
+    dbc.Button("Reset", id="reset-button"),
 ])
 
 @app.callback(
-    [Output('uploaded-files-list', 'children'),
-     Output('conversion-status', 'children'),
-     Output('redirect', 'href'),
-     Output('audio-player', 'src'),
-     Output('output-format', 'value')],
-    [Input('convert-button', 'n_clicks'),
-     Input('upload-image', 'contents')],
-    [State('upload-image', 'filename'),
-     State('output-format', 'value')],
-    prevent_initial_call=True
+    Output('upload-data', 'children'),
+    Output('upload-message', 'children'),
+    Output('converted-image-container', 'children'),
+    Output('conversion-message', 'children'),
+    Input('upload-image', 'contents'),
+    State('upload-image', 'filename'),
+    State('upload-image', 'last_modified'),
+    Input('reset-button', 'n_clicks')
 )
-def handle_conversion_and_download(convert_clicks, contents, filename, output_format):
-    if not convert_clicks:
-        return "", "", None, None, None
+def update_app(content, filename, last_modified, n_clicks):
+    # Handle reset button click
+    if n_clicks:
+        state['uploaded_filename'] = ''
+        state['upload_message'] = ''
+        state['conversion_message'] = ''
+        state['converted_image'] = None
+        return dbc.FileUpload(
+            id='upload-image',
+            multiple=False,
+            children='Drag and Drop or Browse File'
+        ), '', '', ''
 
-    if not contents or not output_format:
-        return "", "Please upload a file and select an output format.", None, None, None
-
-    try:
-        content_type, content_string = contents.split(',')
+    # Handle image upload
+    if content is not None:
+        content_type, content_string = content.split(',')
         decoded = base64.b64decode(content_string)
-        image = Image.open(io.BytesIO(decoded))
+        try:
+            with io.BytesIO(decoded) as image_stream:
+                image = Image.open(image_stream)
+                state['uploaded_filename'] = filename
+                state['upload_message'] = f'Uploaded "{filename}"'
+                return dbc.FileUpload(
+                    id='upload-image',
+                    multiple=False,
+                    children='Drag and Drop or Browse File'
+                ), state['upload_message'], '', ''
+        except Exception as e:
+            state['upload_message'] = f'Upload failed: {str(e)}'
+            return dbc.FileUpload(
+                id='upload-image',
+                multiple=False,
+                children='Drag and Drop or Browse File'
+            ), state['upload_message'], '', ''
 
-        base_filename = os.path.splitext(filename)[0]
-        output_path = os.path.join(output_dir, f"{base_filename}.{output_format}")
-
-        if output_format.lower() in ['jpg', 'jpeg'] and image.mode == 'RGBA':
-            image = image.convert('RGB')
-
-        save_format = 'JPEG' if output_format.lower() in ['jpg', 'jpeg'] else output_format.upper()
-        image.save(output_path, save_format)
-
-        download_href = f"/download/{os.path.basename(output_path)}"
-        return f"Uploaded file: {filename}", "Converted file downloaded!", download_href, None, None
-
-    except Exception as e:
-        return "", f"Failed to convert {filename}: {str(e)}", None, None, None
+    # Return initial state
+    return dbc.FileUpload(
+        id='upload-image',
+        multiple=False,
+        children='Drag and Drop or Browse File'
+    ), '', '', ''
 
 @app.callback(
-    [Output('uploaded-files-list', 'children'),
-     Output('conversion-status', 'children'),
-     Output('redirect', 'href'),
-     Output('audio-player', 'src'),
-     Output('output-format', 'value')],
-    [Input('reset-button', 'n_clicks')],
-    prevent_initial_call=True
+    Output('converted-image-container', 'children'),
+    Output('conversion-message', 'children'),
+    Input('convert-button', 'n_clicks'),
+    State('upload-image', 'filename'),
+    State('output-format', 'value')
 )
-def handle_reset(reset_clicks):
-    if reset_clicks:
-        return "", "", None, None, None
+def convert_image(n_clicks, filename, output_format):
+    if n_clicks is None:
+        return '', ''
 
-@app.server.route('/download/<filename>')
-def download_file(filename):
-    file_path = os.path.join(output_dir, filename)
-    return send_file(file_path, as_attachment=True)
+    if filename is None:
+        return '', 'Please upload an image first.'
+
+    try:
+        # Load the uploaded image
+        image = Image.open(f'uploads/{filename}')
+
+        # Convert the image to the selected format
+        converted_image = io.BytesIO()
+        image.save(converted_image, format=output_format)
+        converted_image.seek(0)
+
+        # Create a data URL for the converted image
+        encoded_image = base64.b64encode(converted_image.read()).decode('utf-8')
+        data_url = f"data:image/{output_format};base64,{encoded_image}"
+
+        # Display the converted image
+        return html.Img(src=data_url, style={'max-width': '500px'}), 'Image converted successfully!'
+
+    except Exception as e:
+        return '', f'Conversion failed: {str(e)}'
 
 if __name__ == '__main__':
     app.run_server(debug=False)
