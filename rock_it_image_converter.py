@@ -65,41 +65,38 @@ app.layout = html.Div([
      Output('redirect', 'href'),
      Output('audio-player', 'src'),
      Output('output-format', 'value')],
-    [Input('convert-button', 'n_clicks')],
+    [Input('convert-button', 'n_clicks'),
+     Input('upload-image', 'contents')],
     [State('upload-image', 'filename'),
      State('output-format', 'value')],
     prevent_initial_call=True
 )
-def handle_conversion_and_download(convert_clicks, filename, output_format):
+def handle_conversion_and_download(convert_clicks, contents, filename, output_format):
     if not convert_clicks:
-        return "", "", None, None, None  # Prevent initial call
+        return "", "", None, None, None
 
     if not contents or not output_format:
-        return "", "Please upload a file and select an output format.", None, None, output_format
+        return "", "Please upload a file and select an output format.", None, None, None
 
     try:
-        # Decode the uploaded file
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
         image = Image.open(io.BytesIO(decoded))
 
-        # Prepare output file path
         base_filename = os.path.splitext(filename)[0]
         output_path = os.path.join(output_dir, f"{base_filename}.{output_format}")
 
-        # Convert RGBA to RGB if saving as JPEG
         if output_format.lower() in ['jpg', 'jpeg'] and image.mode == 'RGBA':
             image = image.convert('RGB')
 
         save_format = 'JPEG' if output_format.lower() in ['jpg', 'jpeg'] else output_format.upper()
         image.save(output_path, save_format)
 
-        # Generate the download link
         download_href = f"/download/{os.path.basename(output_path)}"
-        return f"File uploaded: {filename}", "Converted file downloaded!", download_href, audio_src, output_format 
+        return f"Uploaded file: {filename}", "Converted file downloaded!", download_href, None, None
 
     except Exception as e:
-        return "", f"Failed to convert {filename}: {str(e)}", None, None, output_format 
+        return "", f"Failed to convert {filename}: {str(e)}", None, None, None
 
 @app.callback(
     [Output('uploaded-files-list', 'children'),
@@ -111,10 +108,9 @@ def handle_conversion_and_download(convert_clicks, filename, output_format):
     prevent_initial_call=True
 )
 def handle_reset(reset_clicks):
-    if reset_clicks:  # Only execute if the "Reset" button was clicked
-        return "", "", None, None, None 
+    if reset_clicks:
+        return "", "", None, None, None
 
-# Route for downloading files
 @app.server.route('/download/<filename>')
 def download_file(filename):
     file_path = os.path.join(output_dir, filename)
