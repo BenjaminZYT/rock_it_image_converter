@@ -50,8 +50,11 @@ app.layout = html.Div([
         placeholder="Select a file format",
     ),
     html.Button("Convert and Download", id='convert-button', n_clicks=0),
-    html.Button("Reset", id='reset-button', n_clicks=0, style={'margin-left': '10px', 'backgroundColor': 'red', 'color': 'white'}),
     html.Div(id='conversion-status', style={'margin-top': '20px', 'color': 'green'}),
+    html.P(
+        "To convert a new file, simply upload the new image file and click Convert and Download again.",
+        style={'fontSize': '12px', 'textAlign': 'center', 'marginTop': '10px', 'color': 'gray'}
+    ),
     dcc.Location(id='redirect', refresh=True),
     html.P(
         "Created by Benjamin Zu Yao Teoh - Atlanta, GA - January 2025",
@@ -66,18 +69,13 @@ app.layout = html.Div([
      Output('redirect', 'href'),
      Output('audio-player', 'src')],
     [Input('convert-button', 'n_clicks'),
-     Input('reset-button', 'n_clicks'),
      Input('upload-image', 'contents')],
     [State('upload-image', 'filename'),
      State('output-format', 'value')],
     prevent_initial_call=True
 )
-def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filename, output_format):
+def handle_conversion_and_download(convert_clicks, contents, filename, output_format):
     triggered_id = ctx.triggered_id
-
-    if triggered_id == 'reset-button':
-        # Clear all outputs on reset
-        return "", "", None, None
 
     if triggered_id == 'upload-image' and contents:
         audio_src = "https://www.voicy.network/Content/Clips/Sounds/2022/10/9e13b434-b0f4-4cf7-85b1-0a8eb75e06f9.mp3"  # Clip from "I Feel Good"
