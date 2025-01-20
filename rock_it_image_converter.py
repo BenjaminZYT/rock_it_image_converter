@@ -99,7 +99,7 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
 
             # Generate the download link
             download_href = f"/download/{os.path.basename(output_path)}"
-            return f"File uploaded: {filename}", "Please wait while we convert and download your image.", download_href
+            return f"File uploaded: {filename}", "Converted file downloaded!", download_href
 
         except Exception as e:
             return "", f"Failed to convert {filename}: {str(e)}", None
