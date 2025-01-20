@@ -79,7 +79,7 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
         return "", "", None, None
 
     if triggered_id == 'upload-image' and contents:
-        audio_src = "https://www.soundjay.com/button/beep-07.wav"  # Free beep sound for fun
+        audio_src = "https://www.voicy.network/Content/Clips/Sounds/2022/10/9e13b434-b0f4-4cf7-85b1-0a8eb75e06f9.mp3"  # Clip from "I Feel Good"
         return f"Uploaded file: {filename}", "", None, audio_src
 
     if triggered_id == 'convert-button' and contents:
