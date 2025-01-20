@@ -64,35 +64,35 @@ app.layout = html.Div([
     [Output('uploaded-files-list', 'children'),
      Output('conversion-status', 'children'),
      Output('redirect', 'href'),
-     Output('audio-player', 'src')],
+     Output('audio-player', 'src'),
+     Output('output-format', 'value')],  # Include output-format in the outputs
     [Input('convert-button', 'n_clicks'),
      Input('reset-button', 'n_clicks'),
      Input('upload-image', 'contents')],
-    [State('upload-image', 'filename'),
-     State('output-format', 'value')],
+    [State('upload-image', 'filename')],  # No need for output_format in State
     prevent_initial_call=True
 )
-def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filename, output_format):
+def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filename):
     triggered_id = ctx.triggered_id
 
     # Check if the trigger is the "Reset" button first
     if triggered_id == 'reset-button':
         # Clear all outputs on reset
-        return "", "", None, None
+        return "", "", None, None, None  # Clear the selected output format
 
     # Only proceed if triggered by upload or conversion button
     if triggered_id not in ['upload-image', 'convert-button']:
-        return "", "", None, None 
+        return "", "", None, None, None
 
     audio_src = None  # Initialize audio_src outside the if-else block
 
     if triggered_id == 'upload-image' and contents:
         audio_src = "https://www.voicy.network/Content/Clips/Sounds/2022/10/9e13b434-b0f4-4cf7-85b1-0a8eb75e06f9.mp3"  # Clip from "I Feel Good"
-        return f"Uploaded file: {filename}", "", None, audio_src
+        return f"Uploaded file: {filename}", "", None, audio_src, None  # Don't set output_format on upload
 
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
-            return "", "Please upload a file and select an output format.", None, None
+            return "", "Please upload a file and select an output format.", None, None, None
 
         try:
             # Decode the uploaded file
@@ -113,12 +113,12 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
 
             # Generate the download link
             download_href = f"/download/{os.path.basename(output_path)}"
-            return f"File uploaded: {filename}", "Converted file downloaded!", download_href, audio_src 
+            return f"File uploaded: {filename}", "Converted file downloaded!", download_href, audio_src, None 
 
         except Exception as e:
-            return "", f"Failed to convert {filename}: {str(e)}", None, None
+            return "", f"Failed to convert {filename}: {str(e)}", None, None, None
 
-    return "", "", None, None
+    return "", "", None, None, None  # Return None for output_format in all other cases
 
 # Route for downloading files
 @app.server.route('/download/<filename>')
