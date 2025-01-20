@@ -11,6 +11,7 @@ from dash_extensions.snippets import send_file
 
 # Initialize the Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+server = app.server
 
 # -----------------------------------------------------------------------------
 # Layout
