@@ -51,7 +51,11 @@ app.layout = html.Div([
     html.Button("Reset", id='reset-button', n_clicks=0, style={'margin-left': '10px', 'backgroundColor': 'red', 'color': 'white'}),
     html.Div(id='conversion-status'),
     html.P(
-        "Created by Benjamin Zu Yao Teoh - Atlanta, GA - January 2025\n Email your comments to work.teohzuyao@gmail.com.",
+        [
+            "Created by Benjamin Zu Yao Teoh - Atlanta, GA - January 2025",
+            html.Br(),
+            "~ Email your comments to work.teohzuyao@gmail.com. ~"
+        ],
         style={'fontSize': '7px', 'textAlign': 'center', 'marginTop': '20px'}
     )
 ])
