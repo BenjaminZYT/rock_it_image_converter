@@ -69,10 +69,11 @@ app.layout = html.Div([
     [Input('convert-button', 'n_clicks'),
      Input('reset-button', 'n_clicks'),
      Input('upload-image', 'contents')],
-    [State('upload-image', 'filename')],  # No need for output_format in State
+    [State('upload-image', 'filename'),
+     State('output-format', 'value')],  # Keep output_format in State
     prevent_initial_call=True
 )
-def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filename):
+def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filename, output_format):
     triggered_id = ctx.triggered_id
 
     # Check if the trigger is the "Reset" button first
@@ -91,8 +92,8 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
         return f"Uploaded file: {filename}", "", None, audio_src, None  # Don't set output_format on upload
 
     if triggered_id == 'convert-button' and contents:
-        if not contents or not output_format:
-            return "", "Please upload a file and select an output format.", None, None, None
+        if not contents or not output_format:  # Access output_format here
+            return "", "Please upload a file and select an output format.", None, None, output_format  # Return the selected format
 
         try:
             # Decode the uploaded file
@@ -113,10 +114,10 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
 
             # Generate the download link
             download_href = f"/download/{os.path.basename(output_path)}"
-            return f"File uploaded: {filename}", "Converted file downloaded!", download_href, audio_src, None 
+            return f"File uploaded: {filename}", "Converted file downloaded!", download_href, audio_src, output_format 
 
         except Exception as e:
-            return "", f"Failed to convert {filename}: {str(e)}", None, None, None
+            return "", f"Failed to convert {filename}: {str(e)}", None, None, output_format 
 
     return "", "", None, None, None  # Return None for output_format in all other cases
 
