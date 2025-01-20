@@ -6,15 +6,14 @@ import base64
 from PIL import Image
 from pillow_heif import register_heif_opener
 import dash_bootstrap_components as dbc
+from flask import Flask
 
 # Register HEIC support
 register_heif_opener()
 
-# Create the Dash app
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-
-# Expose the underlying Flask server
-server = app.server
+# Create the underlying Flask server
+server = Flask(__name__)
+app = dash.Dash(__name__, server=server, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 # Define initial state variables
 state = {
