@@ -6,7 +6,7 @@ from pillow_heif import register_heif_opener
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import dcc, html, Input, Output, State, callback_context, exceptions
+from dash import dcc, html, Input, Output, State, exceptions
 
 # Enable HEIC/HEIF support for Pillow
 register_heif_opener()
@@ -71,55 +71,24 @@ app.layout = dbc.Container([
 @app.callback(
     Output('upload-store', 'data'),
     Output('upload-message', 'children'),
-    Output('converted-image-container', 'children'),
-    Output('conversion-message', 'children'),
     Input('upload-image', 'contents'),
     State('upload-image', 'filename'),
-    State('upload-image', 'last_modified'),
-    Input('reset-button', 'n_clicks'),
     prevent_initial_call=True
 )
-def update_app(content, filename, last_modified, n_clicks):
+def handle_upload(content, filename):
     """
-    1) On file upload, store base64 data in dcc.Store.
-    2) Show success/fail messages.
-    3) On 'Reset', clear everything and return initial state.
+    Handles file uploads:
+    - Store the uploaded file in the dcc.Store component.
+    - Display the uploaded filename in a success message.
     """
-    ctx = callback_context
-    if not ctx.triggered:
+    if content is None or filename is None:
         raise exceptions.PreventUpdate
 
-    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
-
-    # If reset was clicked, empty everything
-    if trigger_id == "reset-button":
-        return (
-            {'filename': None, 'content': None},  # Clear store
-            "",  # upload-message
-            "",  # converted-image-container
-            ""   # conversion-message
-        )
-
-    # Handle file upload
-    if content is not None:
-        try:
-            # We won't do the actual image opening here; just store it in memory
-            return (
-                {'filename': filename, 'content': content},
-                f'Uploaded: "{filename}"',
-                "",  # no preview or message yet
-                ""
-            )
-        except Exception as e:
-            return (
-                {'filename': None, 'content': None},
-                f'Upload failed: {str(e)}',
-                "",
-                ""
-            )
-
-    # If no content triggered and it wasn't reset, do nothing
-    raise exceptions.PreventUpdate
+    try:
+        # Store file content and filename
+        return {'filename': filename, 'content': content}, f'Uploaded: "{filename}" successfully!'
+    except Exception as e:
+        return {'filename': None, 'content': None}, f'Error: Failed to upload "{filename}". {str(e)}'
 
 
 @app.callback(
@@ -128,61 +97,71 @@ def update_app(content, filename, last_modified, n_clicks):
     Output('download-image', 'data'),  # Triggers the file download
     Input('convert-button', 'n_clicks'),
     State('upload-store', 'data'),
-    State('output-format', 'value')
+    State('output-format', 'value'),
+    prevent_initial_call=True
 )
 def convert_and_download(n_clicks, upload_data, output_format):
     """
-    Convert the stored image to the selected format, display a preview,
-    and automatically download the converted file.
+    Converts the uploaded image to the selected format and triggers download.
     """
-    if not n_clicks:
+    if n_clicks is None:
         raise exceptions.PreventUpdate
 
-    # Check if user has uploaded a file
     if not upload_data or not upload_data['content']:
         return "", "Please upload an image first.", None
 
-    # Check if a format is selected
     if not output_format:
         return "", "Please select an output format.", None
 
     try:
-        # Decode the stored image from base64
+        # Decode the uploaded file from base64
         content_type, content_string = upload_data['content'].split(',')
         decoded = base64.b64decode(content_string)
         image = Image.open(io.BytesIO(decoded))
 
-        # Convert the image in memory
-        converted = io.BytesIO()
-        # The format argument to PIL should be uppercase: 'JPEG', 'PNG', etc.
-        pil_format = output_format.upper()
-        image.save(converted, format=pil_format)
-        converted.seek(0)
+        # Convert the image to the chosen format
+        converted_image = io.BytesIO()
+        image.save(converted_image, format=output_format.upper())
+        converted_image.seek(0)
 
-        # Make a base64 string for preview
-        encoded_image = base64.b64encode(converted.read()).decode('utf-8')
+        # Generate a base64 preview for display
+        encoded_image = base64.b64encode(converted_image.read()).decode('utf-8')
         data_url = f"data:image/{output_format};base64,{encoded_image}"
 
-        # Reset the in-memory buffer for the actual file download
-        converted.seek(0)
-
         # Prepare the file download
-        # We'll pick a filename like "converted.png", "converted.jpg", etc.
+        converted_image.seek(0)
         download_filename = f"converted.{output_format}"
         download_data = dcc.send_bytes(
-            converted.read(),
+            converted_image.read(),
             filename=download_filename
         )
 
         preview_image = html.Img(src=data_url, style={'max-width': '500px'})
 
-        return preview_image, "File has been downloaded!", download_data
-
+        return preview_image, "File has been downloaded successfully!", download_data
     except Exception as e:
-        return "", f"Conversion failed: {str(e)}", None
+        return "", f"Error: Conversion failed. {str(e)}", None
+
+
+@app.callback(
+    Output('upload-store', 'data'),
+    Output('upload-message', 'children'),
+    Output('converted-image-container', 'children'),
+    Output('conversion-message', 'children'),
+    Input('reset-button', 'n_clicks'),
+    prevent_initial_call=True
+)
+def reset_app(n_clicks):
+    """
+    Resets the app to its initial state:
+    - Clears the upload store.
+    - Clears all messages and image previews.
+    """
+    if n_clicks:
+        return {'filename': None, 'content': None}, "", "", ""
 
 
 if __name__ == "__main__":
-    # On Render, you often need to bind to 0.0.0.0 and a given port from the env
+    # Bind to 0.0.0.0 for Render with dynamic port
     port = int(os.environ.get("PORT", 8050))
     app.run_server(host="0.0.0.0", port=port, debug=False)
