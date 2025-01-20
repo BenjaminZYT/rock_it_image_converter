@@ -75,6 +75,10 @@ app.layout = html.Div([
 def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filename, output_format):
     triggered_id = ctx.triggered_id
 
+    # Only proceed if triggered by upload or conversion button
+    if triggered_id not in ['upload-image', 'convert-button']:
+        return "", "", None, None
+
     if triggered_id == 'reset-button':
         # Clear all outputs on reset
         return "", "", None, None
