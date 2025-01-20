@@ -4,3 +4,5 @@ pillow-heif
 ipywidgets
 ipython
 gunicorn
+dash-uploader==0.7.0
+Flask==3.0.0  # Flask is included by Dash, but explicitly list it to avoid conflicts
