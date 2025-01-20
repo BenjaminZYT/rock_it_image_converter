@@ -41,6 +41,7 @@ app.layout = html.Div([
         },
         multiple=False  # Allow one file at a time for conversion
     ),
+    html.Audio(id='audio-player', src='', controls=False, autoPlay=True, style={'display': 'none'}),
     html.Div(id='uploaded-files-list', style={'margin': '10px', 'color': 'blue'}),
     html.Label("Select output format:"),
     dcc.Dropdown(
@@ -62,7 +63,8 @@ app.layout = html.Div([
 @app.callback(
     [Output('uploaded-files-list', 'children'),
      Output('conversion-status', 'children'),
-     Output('redirect', 'href')],
+     Output('redirect', 'href'),
+     Output('audio-player', 'src')],
     [Input('convert-button', 'n_clicks'),
      Input('reset-button', 'n_clicks'),
      Input('upload-image', 'contents')],
@@ -74,14 +76,15 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
     triggered_id = ctx.triggered_id
 
     if triggered_id == 'reset-button':
-        return "", "", None
+        return "", "", None, None
 
     if triggered_id == 'upload-image' and contents:
-        return f"Uploaded file: {filename}", "", None
+        audio_src = "https://www.soundjay.com/button/beep-07.wav"  # Free beep sound for fun
+        return f"Uploaded file: {filename}", "", None, audio_src
 
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
-            return "", "Please upload a file and select an output format.", None
+            return "", "Please upload a file and select an output format.", None, None
 
         try:
             # Decode the uploaded file
@@ -102,12 +105,12 @@ def handle_conversion_and_download(convert_clicks, reset_clicks, contents, filen
 
             # Generate the download link
             download_href = f"/download/{os.path.basename(output_path)}"
-            return f"File uploaded: {filename}", "Converted file downloaded!", download_href
+            return f"File uploaded: {filename}", "Converted file downloaded!", download_href, None
 
         except Exception as e:
-            return "", f"Failed to convert {filename}: {str(e)}", None
+            return "", f"Failed to convert {filename}: {str(e)}", None, None
 
-    return "", "", None
+    return "", "", None, None
 
 # Route for downloading files
 @app.server.route('/download/<filename>')
