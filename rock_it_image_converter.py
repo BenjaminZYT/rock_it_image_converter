@@ -74,12 +74,12 @@ def handle_image_operations(contents, convert_clicks, reset_clicks, filename, ou
         return "", ""
 
     if triggered_id == 'upload-image' and contents:
-        uploaded_message = html.Div(f"File uploaded: {filename}", style={'color': 'green'})
+        uploaded_message = html.Div(f"✅ File uploaded: {filename}", style={'color': 'green'})
         return uploaded_message, ""
 
     if triggered_id == 'convert-button' and contents:
         if not contents or not output_format:
-            return "", html.Div("Please upload a file and select an output format.", style={'color': 'red'})
+            return "", html.Div("⚠️ Please upload a file and select an output format. ❗", style={'color': 'red'})
 
         try:
             content_type, content_string = contents.split(',')
